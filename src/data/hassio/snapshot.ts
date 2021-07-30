@@ -1,6 +1,7 @@
 import { atLeastVersion } from "../../common/config/version";
 import { HomeAssistant } from "../../types";
 import { hassioApiResultExtractor, HassioResponse } from "./common";
+import { Upload } from "../../util/upload";
 
 export const friendlyFolderName = {
   ssl: "SSL",
@@ -168,28 +169,31 @@ export const createHassioPartialSnapshot = async (
   );
 };
 
-export const uploadSnapshot = async (
+export const createSnapshotUpload = async (
   hass: HomeAssistant,
   file: File
-): Promise<HassioResponse<HassioSnapshot>> => {
+): Promise<Upload> => {
   const fd = new FormData();
-  let resp;
+  let upload: Upload;
   fd.append("file", file);
   if (hass) {
-    resp = await hass.fetchWithAuth("/api/hassio/snapshots/new/upload", {
-      method: "POST",
-      body: fd,
-    });
+    upload = await hass.uploadWithAuth("/api/hassio/snapshots/new/upload", fd);
   } else {
     // When called from onboarding we don't have hass
-    resp = await fetch("/api/hassio/snapshots/new/upload", {
-      method: "POST",
-      body: fd,
-    });
+    upload = new Upload("/api/hassio/snapshots/new/upload", fd, {});
   }
+  return upload;
+};
+
+export const doSnapshotUpload = async (
+  upload: Upload
+): Promise<HassioResponse<HassioSnapshot>> => {
+  const resp = await upload.upload();
 
   if (resp.status === 413) {
     throw new Error("Uploaded snapshot is too large");
+  } else if (resp.status === 400) {
+    throw new Error("Uploaded snapshot is invalid");
   } else if (resp.status !== 200) {
     throw new Error(`${resp.status} ${resp.statusText}`);
   }

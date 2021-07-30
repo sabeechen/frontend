@@ -1,4 +1,4 @@
-import { mdiClose } from "@mdi/js";
+import { mdiClose, mdiArchiveArrowUp } from "@mdi/js";
 import { css, CSSResultGroup, html, LitElement, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import { fireEvent } from "../../../../src/common/dom/fire_event";
@@ -6,8 +6,14 @@ import "../../../../src/components/ha-header-bar";
 import { HassDialog } from "../../../../src/dialogs/make-dialog-manager";
 import { haStyleDialog } from "../../../../src/resources/styles";
 import type { HomeAssistant } from "../../../../src/types";
-import "../../components/hassio-upload-snapshot";
+import "../../../../src/components/ha-file-upload";
 import { HassioSnapshotUploadDialogParams } from "./show-dialog-snapshot-upload";
+import { showAlertDialog } from "../../../../src/dialogs/generic/show-dialog-box";
+import {
+  createSnapshotUpload,
+} from "../../../../src/data/hassio/snapshot";
+import { extractApiErrorMessage } from "../../../../src/data/hassio/common";
+import { Upload } from "../../../../src/util/upload";
 
 @customElement("dialog-hassio-snapshot-upload")
 export class DialogHassioSnapshotUpload
@@ -17,6 +23,8 @@ export class DialogHassioSnapshotUpload
   @property({ attribute: false }) public hass!: HomeAssistant;
 
   @state() private _params?: HassioSnapshotUploadDialogParams;
+
+  @state() private _upload?: Upload;
 
   public async showDialog(
     params: HassioSnapshotUploadDialogParams
@@ -47,7 +55,7 @@ export class DialogHassioSnapshotUpload
         escapeKeyAction
         hideActions
         .heading=${true}
-        @closed=${this.closeDialog}
+        @closed=${this._cancelAndClose}
       >
         <div slot="heading">
           <ha-header-bar>
@@ -57,18 +65,85 @@ export class DialogHassioSnapshotUpload
             </mwc-icon-button>
           </ha-header-bar>
         </div>
-        <hassio-upload-snapshot
-          @snapshot-uploaded=${this._snapshotUploaded}
-          .hass=${this.hass}
-        ></hassio-upload-snapshot>
+        <ha-file-upload
+          .upload=${this._upload}
+          .icon=${mdiArchiveArrowUp}
+          accept="application/x-tar"
+          label="Upload snapshot"
+          @file-picked=${this._uploadFile}
+          @cancel-upload=${this._cancel}
+          auto-open-file-dialog
+        ></ha-file-upload>
       </ha-dialog>
     `;
   }
 
-  private _snapshotUploaded(ev) {
-    const snapshot = ev.detail.snapshot;
+  private _snapshotUploaded(snapshot) {
     this._params?.showSnapshot(snapshot.slug);
     this.closeDialog();
+  }
+
+  private _cancel() {
+    if (this._upload) {
+      this._upload.abort();
+    }
+  }
+
+  private _cancelAndClose() {
+    this._cancel();
+    this.closeDialog();
+  }
+
+  private async _uploadFile(ev) {
+    const file = ev.detail.files[0];
+    if (!["application/x-tar"].includes(file.type)) {
+      showAlertDialog(this, {
+        title: "Unsupported file format",
+        text: "Please choose a Home Assistant snapshot file (.tar)",
+        confirmText: "ok",
+      });
+      return;
+    }
+    try {
+      this._upload = await createSnapshotUpload(this.hass, file);
+      const resp = await this._upload.upload();
+      if (resp.status === 200) {
+        const snapshot = (await resp.json()).data;
+
+        // Querying for a snaphot immediately after upload can return
+        // "Snapshot not found" with large snapshots, so give it few seconds.
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        this._snapshotUploaded(snapshot);
+      } else {
+        let message = "";
+        if (resp.status === 400) {
+          // HTTP 400/Bad Request means the supervisor couldn't parse the snapshot.
+          message = "Please make sure this is a valid snapshot file.";
+        } else if (resp.status === 413) {
+          message = "The snapshot is too large.";
+        } else {
+          // Error responses from the supervisor always include an error message
+          message = extractApiErrorMessage(await resp.json());
+        }
+        showAlertDialog(this, {
+          title: "Upload failed",
+          text: message,
+          confirmText: "ok",
+        });
+      }
+    } catch (err) {
+      if (err.message !== "abort") {
+        // A network error caused the upload to fail, for example if the
+        // connection was reset, so just report the error.
+        showAlertDialog(this, {
+          title: "Upload failed",
+          text: "",
+          confirmText: "ok",
+        });
+      }
+    } finally {
+      this._upload = undefined;
+    }
   }
 
   static get styles(): CSSResultGroup {

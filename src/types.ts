@@ -12,6 +12,7 @@ import { CoreFrontendUserData } from "./data/frontend";
 import { FrontendLocaleData, getHassTranslations } from "./data/translation";
 import { Themes } from "./data/ws-themes";
 import { ExternalMessaging } from "./external_app/external_messaging";
+import { Upload } from "./util/upload";
 
 declare global {
   /* eslint-disable no-var, no-redeclare */
@@ -232,6 +233,7 @@ export interface HomeAssistant {
     headers?: Record<string, string>
   ): Promise<T>;
   fetchWithAuth(path: string, init?: Record<string, any>): Promise<Response>;
+  uploadWithAuth(path: string, data: FormData): Promise<Upload>;
   sendWS(msg: MessageBase): void;
   callWS<T>(msg: MessageBase): Promise<T>;
   loadBackendTranslation(
