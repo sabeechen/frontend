@@ -1308,10 +1308,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@braintree/sanitize-url@npm:^5.0.1":
-  version: 5.0.2
-  resolution: "@braintree/sanitize-url@npm:5.0.2"
-  checksum: 16a022d29d584f96f6982443946668bddd2d900140c0b56316bafb17cc2d50bc4b5423104847bd33564c4ec0104bcda71ceb81258928afe60fb9bb35c23ee590
+"@braintree/sanitize-url@npm:^6.0.1":
+  version: 6.0.2
+  resolution: "@braintree/sanitize-url@npm:6.0.2"
+  checksum: e137818443c5c28632d69630d0c8eed90034643a1200b1b742226be6b1dbe289d0a0b184d18b77c8a57d53b43843dcb48d6d987398d9b285fcd8a4dc6011f4f5
   languageName: node
   linkType: hard
 
@@ -8712,7 +8712,7 @@ fsevents@~2.3.1:
     "@babel/plugin-syntax-import-meta": ^7.10.4
     "@babel/preset-env": ^7.14.7
     "@babel/preset-typescript": ^7.14.5
-    "@braintree/sanitize-url": ^5.0.1
+    "@braintree/sanitize-url": ^6.0.1
     "@codemirror/commands": ^0.18.0
     "@codemirror/gutter": ^0.18.0
     "@codemirror/highlight": ^0.18.0

@@ -22,7 +22,7 @@
   "author": "Paulus Schoutsen <Paulus@PaulusSchoutsen.nl> (http://paulusschoutsen.nl)",
   "license": "Apache-2.0",
   "dependencies": {
-    "@braintree/sanitize-url": "^5.0.1",
+    "@braintree/sanitize-url": "^6.0.1",
     "@codemirror/commands": "^0.18.0",
     "@codemirror/gutter": "^0.18.0",
     "@codemirror/highlight": "^0.18.0",
