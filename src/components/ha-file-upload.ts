@@ -1,17 +1,21 @@
+import "@material/mwc-button/mwc-button";
 import "@material/mwc-icon-button/mwc-icon-button";
-import { mdiClose } from "@mdi/js";
+import { mdiClose, mdiCancel } from "@mdi/js";
 import "@polymer/iron-input/iron-input";
 import "@polymer/paper-input/paper-input-container";
 import { css, html, LitElement, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state, query } from "lit/decorators";
 import { classMap } from "lit/directives/class-map";
 import { fireEvent } from "../common/dom/fire_event";
-import "./ha-circular-progress";
+import "@material/mwc-linear-progress";
 import "./ha-svg-icon";
+import { bytesToString } from "../util/bytes-to-string";
+import { Upload } from "../util/upload";
 
 declare global {
   interface HASSDomEvents {
     "file-picked": { files: FileList };
+    "cancel-upload": Record<string, never>;
   }
 }
 
@@ -25,7 +29,24 @@ export class HaFileUpload extends LitElement {
 
   @property() public value: string | TemplateResult | null = null;
 
-  @property({ type: Boolean }) private uploading = false;
+  private _upload?: Upload;
+
+  set upload(val: Upload | undefined) {
+    this._bindToUpload(val);
+  }
+
+  @property({ attribute: false })
+  get upload() {
+    return this._upload;
+  }
+
+  @state() private indeterminate = false;
+
+  @state() private progress = 0;
+
+  @state() private totalBytes = 0;
+
+  @state() private progressBytes = 0;
 
   @property({ type: Boolean, attribute: "auto-open-file-dialog" })
   private autoOpenFileDialog = false;
@@ -37,12 +58,12 @@ export class HaFileUpload extends LitElement {
   protected firstUpdated(changedProperties: PropertyValues) {
     super.firstUpdated(changedProperties);
     if (this.autoOpenFileDialog) {
-      this._input?.click();
+      this._openFileDialog();
     }
   }
 
   protected updated(changedProperties: PropertyValues) {
-    if (changedProperties.has("_drag") && !this.uploading) {
+    if (changedProperties.has("_drag") && !this._upload) {
       (
         this.shadowRoot!.querySelector("paper-input-container") as any
       )._setFocused(this._drag);
@@ -51,12 +72,25 @@ export class HaFileUpload extends LitElement {
 
   public render(): TemplateResult {
     return html`
-      ${this.uploading
-        ? html`<ha-circular-progress
-            alt="Uploading"
-            size="large"
-            active
-          ></ha-circular-progress>`
+      ${this._upload
+        ? html` <div class="flex-container">
+              <mwc-linear-progress
+                class="progress-bar spaced"
+                progress=${this.progress}
+                ?indeterminate=${this.indeterminate}
+              ></mwc-linear-progress>
+              <span class="spaced">${Math.floor(this.progress * 100)}%</span>
+              <mwc-icon-button class="spaced" @click=${this._cancelUpload}>
+                <ha-svg-icon
+                  class="warning-svg"
+                  .path=${mdiCancel}
+                ></ha-svg-icon>
+              </mwc-icon-button>
+            </div>
+            <div>
+              ${bytesToString(this.progressBytes)} /
+              ${bytesToString(this.totalBytes)}
+            </div>`
         : html`
             <label for="input">
               <paper-input-container
@@ -88,13 +122,39 @@ export class HaFileUpload extends LitElement {
                     >
                       <ha-svg-icon .path=${mdiClose}></ha-svg-icon>
                     </mwc-icon-button>`
-                  : html`<mwc-icon-button slot="suffix">
+                  : html`<mwc-icon-button
+                      slot="suffix"
+                      @click=${this._openFileDialog}
+                    >
                       <ha-svg-icon .path=${this.icon}></ha-svg-icon>
                     </mwc-icon-button>`}
               </paper-input-container>
             </label>
           `}
     `;
+  }
+
+  private _bindToUpload(val?: Upload) {
+    const oldValue = this._upload;
+    if (val != null) {
+      val.setListener((uploaded, total) => {
+        this.progress = uploaded / total;
+        this.progressBytes = uploaded;
+        this.totalBytes = total;
+        if (this.progress === 1 || this.progress === 0) {
+          // Display the progress bar as "indeterminate" while any
+          // post-processing happens after the upload or before any
+          // bytes get sent.
+          this.indeterminate = true;
+        }
+      });
+    }
+    this._upload = val;
+    this.requestUpdate("upload", oldValue);
+  }
+
+  private _openFileDialog() {
+    this._input?.click();
   }
 
   private _handleDrop(ev: DragEvent) {
@@ -128,6 +188,12 @@ export class HaFileUpload extends LitElement {
     fireEvent(this, "change");
   }
 
+  private _cancelUpload(_ev: Event) {
+    fireEvent(this, "cancel-upload", {});
+    this.upload = undefined;
+    this.progress = 0;
+  }
+
   static get styles() {
     return css`
       paper-input-container {
@@ -158,9 +224,21 @@ export class HaFileUpload extends LitElement {
         --mdc-icon-button-size: 24px;
         --mdc-icon-size: 20px;
       }
-      ha-circular-progress {
-        display: block;
-        text-align-last: center;
+      .flex-container {
+        display: flex;
+        margin-top: 10px;
+        margin-bottom: 10px;
+      }
+      .progress-bar {
+        padding-top: 10px;
+        width: 100%;
+      }
+      .spaced {
+        padding-left: 4px;
+        padding-right: 4px;
+      }
+      .warning-svg {
+        fill: var(--error-color);
       }
     `;
   }

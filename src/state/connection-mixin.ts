@@ -19,7 +19,7 @@ import { NumberFormat, TimeFormat } from "../data/translation";
 import { subscribePanels } from "../data/ws-panels";
 import { translationMetadata } from "../resources/translations-metadata";
 import { Constructor, ServiceCallResponse } from "../types";
-import { fetchWithAuth } from "../util/fetch-with-auth";
+import { fetchWithAuth, uploadWithAuth } from "../util/fetch-with-auth";
 import { getState } from "../util/ha-pref-storage";
 import hassCallApi from "../util/hass-call-api";
 import { getLocalLanguage } from "../util/hass-translation";
@@ -116,6 +116,8 @@ export const connectionMixin = <T extends Constructor<HassBaseEl>>(
           path: string,
           init: Parameters<typeof fetchWithAuth>[2]
         ) => fetchWithAuth(auth, `${auth.data.hassUrl}${path}`, init),
+        uploadWithAuth: (path: string, data: FormData) =>
+          uploadWithAuth(auth, `${auth.data.hassUrl}${path}`, data),
         // For messages that do not get a response
         sendWS: (msg) => {
           if (__DEV__) {

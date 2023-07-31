@@ -4,7 +4,11 @@ import "@polymer/paper-input/paper-input-container";
 import { html, LitElement, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import { fireEvent } from "../common/dom/fire_event";
-import { createImage, generateImageThumbnailUrl } from "../data/image";
+import {
+  createImageUpload,
+  doImageUpload,
+  generateImageThumbnailUrl,
+} from "../data/image";
 import { showAlertDialog } from "../dialogs/generic/show-dialog-box";
 import {
   CropOptions,
@@ -14,6 +18,7 @@ import { HomeAssistant } from "../types";
 import "./ha-circular-progress";
 import "./ha-file-upload";
 import "./ha-svg-icon";
+import { Upload } from "../util/upload";
 
 @customElement("ha-picture-upload")
 export class HaPictureUpload extends LitElement {
@@ -29,7 +34,7 @@ export class HaPictureUpload extends LitElement {
 
   @property({ type: Number }) public size = 512;
 
-  @state() private _uploading = false;
+  @state() private _upload: Upload | undefined = undefined;
 
   public render(): TemplateResult {
     return html`
@@ -37,9 +42,10 @@ export class HaPictureUpload extends LitElement {
         .icon=${mdiImagePlus}
         .label=${this.label ||
         this.hass.localize("ui.components.picture-upload.label")}
-        .uploading=${this._uploading}
+        .upload=${this._upload}
         .value=${this.value ? html`<img .src=${this.value} />` : ""}
         @file-picked=${this._handleFilePicked}
+        @cancel-upload=${this._cancelUpload}
         accept="image/png, image/jpeg, image/gif"
       ></ha-file-upload>
     `;
@@ -84,17 +90,27 @@ export class HaPictureUpload extends LitElement {
       });
       return;
     }
-    this._uploading = true;
     try {
-      const media = await createImage(this.hass, file);
+      this._upload = await createImageUpload(this.hass, file);
+      const media = await doImageUpload(this._upload);
       this.value = generateImageThumbnailUrl(media.id, this.size);
       fireEvent(this, "change");
     } catch (err) {
+      if (err instanceof Error && err.message === "abort") {
+        // User cancelled the upload.
+        return;
+      }
       showAlertDialog(this, {
         text: err.toString(),
       });
     } finally {
-      this._uploading = false;
+      this._upload = undefined;
+    }
+  }
+
+  private _cancelUpload() {
+    if (this._upload) {
+      this._upload.abort();
     }
   }
 }

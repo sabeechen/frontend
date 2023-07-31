@@ -1,4 +1,5 @@
 import { HomeAssistant } from "../types";
+import { Upload } from "../util/upload";
 
 interface Image {
   filesize: number;
@@ -18,16 +19,17 @@ export const generateImageThumbnailUrl = (mediaId: string, size: number) =>
 export const fetchImages = (hass: HomeAssistant) =>
   hass.callWS<Image[]>({ type: "image/list" });
 
-export const createImage = async (
+export const createImageUpload = async (
   hass: HomeAssistant,
   file: File
-): Promise<Image> => {
+): Promise<Upload> => {
   const fd = new FormData();
   fd.append("file", file);
-  const resp = await hass.fetchWithAuth("/api/image/upload", {
-    method: "POST",
-    body: fd,
-  });
+  return hass.uploadWithAuth("/api/image/upload", fd);
+};
+
+export const doImageUpload = async (upload: Upload): Promise<Image> => {
+  const resp = await upload.upload();
   if (resp.status === 413) {
     throw new Error("Uploaded image is too large");
   } else if (resp.status !== 200) {
